@@ -1,0 +1,105 @@
+version: '2.4'  # optional since v1.27.0
+
+services:
+  resolver:
+    image: tolvmannen/slem-resolver
+    environment:
+      DOMAIN: ${DOMAIN}
+    networks:
+      lan-dmz:
+        ipv4_address: '10.0.55.53'
+        ipv6_address: 'fd00:dead:beef:0:55::53'
+    volumes:
+      - './common/ssh:/home/ubuntu/.ssh:rw'
+      - './conf:/tmp/conf:rw'
+    container_name: resolver
+    hostname: '${GROUPTAG}-resolver'
+
+  jumpgate:
+    image: tolvmannen/slem-jumpgate
+    environment:
+      DOMAIN: ${DOMAIN}
+    networks:
+      lan-dmz:
+        ipv4_address: '10.0.55.22'
+        ipv6_address: 'fd00:dead:beef:0:55::22'
+    ports:
+      - '22:22'
+    volumes:
+      - './common/ssh:/home/ubuntu/.ssh:rw'
+      - './conf:/tmp/conf:rw'
+      - './conf/mailserver/ubuntu:/var/mail/ubuntu:rw'
+    container_name: jumpgate
+    hostname: '${GROUPTAG}-jumpgate'
+    depends_on:
+      - "resolver"
+
+  authoritative:
+    image: tolvmannen/slem-bindauthprimary
+    environment:
+      DOMAIN: ${DOMAIN}
+    networks:
+      lan-dmz:
+        ipv4_address: '10.0.77.53'
+        ipv6_address: 'fd00:dead:beef:0:77::53'
+    ports:
+      - '53:53/tcp'
+      - '53:53/udp'
+    volumes:
+      - './common/ssh:/home/ubuntu/.ssh:rw'
+      - './conf:/tmp/conf:rw'
+    container_name: authoritative
+    hostname: '${GROUPTAG}-DNSprimary'
+    depends_on:
+      - "resolver"
+
+  webserver:
+    image: tolvmannen/slem-webserver
+    environment:
+      DOMAIN: ${DOMAIN}
+    networks:
+      lan-dmz:
+        ipv4_address: '10.0.77.80'
+        ipv6_address: 'fd00:dead:beef:0:77::80'
+    ports:
+            - '80:80'
+    volumes:
+      - './common/ssh:/home/ubuntu/.ssh:rw'
+      - './conf:/tmp/conf:rw'
+    container_name: webserver
+    hostname: '${GROUPTAG}-webserver'
+    depends_on:
+      - "resolver"
+
+  mailserver:
+    image: tolvmannen/slem-mailserver
+    environment:
+      DOMAIN: ${DOMAIN}
+    networks:
+      lan-dmz:
+        ipv4_address: '10.0.77.25'
+        ipv6_address: 'fd00:dead:beef:0:77::25'
+    ports:
+            - '25:25'
+    volumes:
+      - './common/ssh:/home/ubuntu/.ssh:rw'
+      - './conf:/tmp/conf:rw'
+      - './conf/mailserver/ubuntu:/var/mail/ubuntu:rw'
+    container_name: mailserver
+    hostname: '${GROUPTAG}-mailserver'
+    depends_on:
+      - "resolver"
+
+networks:
+  lan-dmz:
+    enable_ipv6: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/16
+          gateway: 10.0.0.1
+        - subnet: fd00:dead:beef::/64
+          gateway: fd00:dead:beef::1

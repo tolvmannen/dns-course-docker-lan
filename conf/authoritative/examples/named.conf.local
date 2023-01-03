@@ -1,0 +1,4 @@
+zone "slemtest.examples.nu"{
+  type master;
+  file "slemtest.examples.nu";
+};
